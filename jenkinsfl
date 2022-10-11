@@ -1,0 +1,76 @@
+pipeline {
+      agent  any
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('ytech-aws-secret-key-id')
+        AWS_SECRET_ACCESS_KEY = credentials('ytech-aws-secret-access-key')
+    }
+   
+    stages {
+       
+        
+       stage('Git CheckOut') {
+           steps {
+                 git branch: 'main', url: 'https://github.com/n4devops/ytechrepo.git'
+           }
+               
+        }    
+        
+       stage('terraform init') {
+           steps {
+                 sh ('terraform init  -migrate-state -force-copy') 
+           }
+        }
+        
+        
+        stage('terraform plan') {
+            
+           steps {
+                
+                 sh('terraform plan')
+                 
+           }
+        } 
+        
+        stage('terraform validate') {
+           steps {
+                 sh('terraform validate')
+           }
+        } 
+        
+         stage('apply') {
+            when {
+                expression { params.action == 'apply' }
+            }
+            steps {
+                sh ('terraform apply --auto-approve')
+                sh('terraform state list')
+                
+                script{
+                private_ip = sh(returnStdout: true, script: "terraform output ec2_instance_web")
+               
+                }
+            }
+           
+        } 
+        
+         stage('destroy') {
+            when {
+                expression { params.action == 'destroy' }
+            }
+            steps {
+                sh ('terraform destroy --auto-approve')
+            }
+        } 
+        
+      }
+      post{
+             
+             success{
+                 
+                 echo"terraform  - ec2 IP is   ${private_ip}"
+                }
+            failure{
+                 echo "failed block"
+                }
+        }
+    }
